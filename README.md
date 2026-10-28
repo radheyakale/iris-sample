@@ -45,6 +45,12 @@ Dates that are not a real calendar day stay null. A teaser with no title or no l
 
 A place name without a coordinate is `ambiguous`. A missing location, a non-numeric value, `(0, 0)`, an unknown CRS, or a point outside the Germany bounds is `unresolved` and the geometry stays null. Longitude/latitude in EPSG:4326 is transformed to EPSG:25832. Values already in EPSG:25832 are stored after the same bounds check.
 
+## Assumptions
+
+- Hearings belong in phase 1 because they are part of data acquisition. `python main.py all` runs the scraper and then the loader there.
+- `/de/mitmachen` is the listing to fetch. The portal home page is configured and is not fetched. `/de/system/suchergebnisseite` is not used because `robots.txt` disallows it.
+- A row is kept only when the title or place text is a hearing and either regional planning or a substation expansion. Other procedures on the same page are counted and dropped.
+
 ## How to run
 
 ```bash
