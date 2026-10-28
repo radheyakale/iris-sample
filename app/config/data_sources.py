@@ -34,6 +34,18 @@ class CountryConfig:
 DATA_SOURCES = {
 
     # ------------------------------------------------------
+    # Hearings
+    # ------------------------------------------------------
+
+    "hearings": DataSource(
+        name="Marktstammdatenregister",
+        country_code="DE",
+        urls=(
+            "https://beteiligungsportal.baden-wuerttemberg.de/",
+        ),
+    ),
+
+    # ------------------------------------------------------
     # MaStR
     # ------------------------------------------------------
 

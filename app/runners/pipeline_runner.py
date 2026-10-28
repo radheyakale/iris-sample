@@ -49,6 +49,18 @@ from app.runners.overpass_transform_runner import (
 )
 
 # ==========================================================
+# HEARINGS
+# ==========================================================
+
+from app.runners.hearings_runner import (
+    run as run_hearings,
+)
+
+from app.runners.hearings_parser_runner import (
+    run as run_hearings_parser,
+)
+
+# ==========================================================
 # MASTR
 # ==========================================================
 
@@ -194,6 +206,12 @@ class PipelineRunner:
 
             "mastr-parse": (
                 self.mastr_parse
+            ),
+
+            "hearings": self.hearings,
+
+            "hearings-parse": (
+                self.hearings_parse
             ),
 
             "mastr-transform": (
@@ -538,6 +556,49 @@ class PipelineRunner:
         else:
 
             run_overpass_transform()
+
+
+    # ======================================================
+    # HEARINGS
+    # ======================================================
+
+    def hearings(self):
+
+        print(
+            "▶ Running hearings Scraper..."
+        )
+
+        paths = self.get_paths()
+
+        if paths:
+
+            run_hearings(
+                paths=paths,
+            )
+
+        else:
+
+            run_hearings()
+
+
+    def hearings_parse(self):
+
+        print(
+            "▶ Running hearings Parser..."
+        )
+
+        paths = self.get_paths()
+
+        if paths:
+
+            run_hearings_parser(
+                paths=paths,
+            )
+
+        else:
+
+            run_hearings_parser()
+
 
     # ======================================================
     # MASTR
@@ -1047,6 +1108,10 @@ class PipelineRunner:
         )
 
         self.country()
+
+        self.hearings()
+
+        self.hearings_parse()
 
         self.markets()
 
