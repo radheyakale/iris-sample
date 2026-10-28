@@ -1,3 +1,6 @@
+from urllib.parse import urlsplit
+from urllib.robotparser import RobotFileParser
+
 from app.config.data_sources import get_data_source
 from app.config.paths import DataPaths
 from app.scrapers.base.http_client import HttpClient
@@ -63,6 +66,22 @@ class HearingsScraper:
             )
 
         url = self.source.urls[0]
+
+        robots = RobotFileParser()
+        origin = urlsplit(url)
+        robots.set_url(
+            f"{origin.scheme}://{origin.netloc}/de/robots.txt"
+        )
+        robots.read()
+
+        if not robots.can_fetch("*", url):
+
+            print(
+                "Excluded by robots.txt: "
+                f"{url}"
+            )
+
+            return
 
         for page in range(
             start_page,

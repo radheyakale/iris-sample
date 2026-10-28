@@ -41,6 +41,7 @@ DATA_SOURCES = {
         name="Marktstammdatenregister",
         country_code="DE",
         urls=(
+            "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen",
             "https://beteiligungsportal.baden-wuerttemberg.de/",
         ),
     ),

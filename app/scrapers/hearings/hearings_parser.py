@@ -3,6 +3,7 @@ import json
 from app.config.data_sources import get_data_source
 from app.config.paths import DataPaths
 from app.scrapers.base.parser import HearingsHTMLDataParser
+from app.scrapers.hearings.hearings_filter import HearingsFilter
 
 
 class HearingsParser:
@@ -106,6 +107,10 @@ class HearingsParser:
             merged_records.extend(
                 records
             )
+
+        merged_records = HearingsFilter().apply(
+            merged_records
+        )
 
         with self.output_file.open(
             "w",
