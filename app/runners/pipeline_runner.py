@@ -60,6 +60,10 @@ from app.runners.hearings_parser_runner import (
     run as run_hearings_parser,
 )
 
+from app.runners.hearings_load_runner import (
+    run as run_hearings_load,
+)
+
 # ==========================================================
 # MASTR
 # ==========================================================
@@ -212,6 +216,10 @@ class PipelineRunner:
 
             "hearings-parse": (
                 self.hearings_parse
+            ),
+
+            "hearings-load": (
+                self.hearings_load
             ),
 
             "mastr-transform": (
@@ -598,6 +606,25 @@ class PipelineRunner:
         else:
 
             run_hearings_parser()
+
+
+    def hearings_load(self):
+
+        print(
+            "▶ Loading hearings into signal_ingest..."
+        )
+
+        paths = self.get_paths()
+
+        if paths:
+
+            run_hearings_load(
+                paths=paths,
+            )
+
+        else:
+
+            run_hearings_load()
 
 
     # ======================================================

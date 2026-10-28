@@ -6,6 +6,7 @@ from app.database.models.power_infrastructure import PowerInfrastructure
 from app.database.models.news_article import NewsArticle
 from app.database.models.news_match import NewsMatch
 from app.database.models.osm_infrastructure import OsmInfrastructure
+from app.database.models.signal_ingest import SignalIngest
 
 __all__ = [
     "Facility",
@@ -15,4 +16,5 @@ __all__ = [
     "NewsArticle",
     "NewsMatch",
     "OsmInfrastructure",
+    "SignalIngest",
 ]
