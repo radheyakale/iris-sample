@@ -1,0 +1,16 @@
+{
+  "rows_loaded": 3,
+  "inserted": 3,
+  "updated": 0,
+  "unchanged": 0,
+  "duplicates_skipped": 1,
+  "empty_pages": 1,
+  "empty_response": false,
+  "ambiguous": 1,
+  "unresolved": 1,
+  "resolved": 1,
+  "dropped_missing_fields": 2,
+  "dropped_not_relevant": 1,
+  "malformed_records": 1,
+  "malformed_file": false
+}

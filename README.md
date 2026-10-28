@@ -1,486 +1,113 @@
-# 🏢 NRW Data Center Business Intelligence Platform
+# Baden-Württemberg hearings ingest
 
-### AI-Powered Geospatial Business Intelligence for Data Center Site Selection and Infrastructure Analysis
+Public hearings for substation expansions and regional plan amendments, loaded into `iris_staging.signal_ingest`.
 
-The NRW Data Center Business Intelligence Platform is an AI-powered decision support system that combines geospatial analysis, infrastructure intelligence, renewable energy data, market intelligence, and conversational AI into a single interactive dashboard.
+The table lives in `iris_staging`. The Alembic migration creates that schema. It is not an `app` schema.
 
-Built with **Python**, **PostgreSQL/PostGIS**, **GeoPandas**, **PyDeck**, **Streamlit**, and **OpenAI**, the platform enables users to evaluate data center locations through interactive GIS visualization, site scoring, and AI-assisted insights.
+Tested on PostgreSQL 16 and PostGIS 3.4. `docker-compose.yml` uses `postgis/postgis:16-3.4`. `platform: linux/amd64` was added because this was tested on a MacBook. A data volume created by PostgreSQL 17 will not start under this image. Recreate that volume before `alembic upgrade head`.
 
----
+## Source
 
-## Table of Contents
+| | |
+|---|---|
+| Portal | https://beteiligungsportal.baden-wuerttemberg.de |
+| Listing used | https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen |
+| Pattern | HTML. Selectors are `article.teaser` and, where present, `li.link-list__item`. |
+| Source system stored on each row | `beteiligung_bw` |
 
-- [Overview](#overview)
-- [Dashboard Preview](#dashboard-preview)
-- [Key Features](#key-features)
-- [System Architecture](#system-architecture)
-- [How It Works](#how-it-works)
-- [Dashboard Modules](#dashboard-modules)
-- [AI Advisor](#ai-advisor)
-- [Technology Stack](#technology-stack)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Running the Dashboard](#running-the-dashboard)
-- [Project Status](#current-project-status)
-- [Roadmap](#roadmap)
-- [Vision](#vision)
+`/de/mitmachen` is the public participation listing: procedure teasers and recent comments. The portal home page is configured as a second URL and is not fetched.
 
-![Python]
-![PostgreSQL]
-![PostGIS]
-![Streamlit]
-![OpenAI]
-![Status]
+## Why the search page is excluded
 
-## Overview
+`/de/system/suchergebnisseite` can search announcements, and it is the page that paginates. `robots.txt` disallows it for `User-agent: *`. The scraper reads `https://beteiligungsportal.baden-wuerttemberg.de/de/robots.txt` through the shared HTTP client and does not request a disallowed URL.
 
-Selecting an optimal location for a modern data center requires much more than available land.
+`/de/mitmachen` is allowed. It is one HTML document. `page` and `pageSize` do not change it, so the scraper fetches that listing once and deletes any older `page_*.html` files from a previous five-page run. A second load does not insert rows whose `(source_system, source_id)` and content hash are already stored.
 
-Power infrastructure, renewable energy, electrical grid capacity, market activity, and surrounding infrastructure all influence the long-term viability of a site.
+## Field mapping
 
-The NRW Data Center Business Intelligence Platform integrates multiple public infrastructure datasets into a unified PostgreSQL/PostGIS database and provides an interactive AI-powered dashboard for analyzing, comparing, and evaluating potential data center locations.
+| Staging column | Source |
+|---|---|
+| `source_id` | `comment[searchComment]` when the URL has one, otherwise the last path segment |
+| `title` | `.teaser__headline` (`h2` or `h3`) |
+| `published_at` | A date introduced as Veröffentlichung, Bekanntmachung, or publiziert. A deadline is not treated as the publication date. |
+| `participation_start` | Date after vom / von / ab |
+| `participation_end` | Date after bis / bis zum |
+| `source_url` | Teaser link, resolved against the page base href |
+| `place_text` | Place captured from "in {Place}" or "Haushalt {Place}" |
+| `signal_type` | `regional_plan_amendment` or `substation_expansion_hearing`, from the title and place text |
+| `geom` | EPSG:25832 point when the record has a usable longitude/latitude or easting/northing |
+| `location_status` | `resolved`, `ambiguous` (place only), or `unresolved` |
+| `location_note` | Why a point was not stored |
+| `raw_payload` | The parsed record |
+| `content_hash` | Hash of the staged fields, used to skip an unchanged re-run |
 
-The platform combines:
+Dates that are not a real calendar day stay null. A teaser with no title or no link is counted and dropped. The live listing's procedure cards say "bis zum {date}", which is stored as `participation_end`.
 
-- Geospatial Intelligence
-- Infrastructure Analysis
-- Site Scoring
-- Market Intelligence
-- AI-assisted Decision Support
+A place name without a coordinate is `ambiguous`. A missing location, a non-numeric value, `(0, 0)`, an unknown CRS, or a point outside the Germany bounds is `unresolved` and the geometry stays null. Longitude/latitude in EPSG:4326 is transformed to EPSG:25832. Values already in EPSG:25832 are stored after the same bounds check.
 
-# Key Features
-
-## GIS Intelligence
-
-✔ Interactive GIS Infrastructure Map
-
-✔ Data Center Visualization
-
-✔ High Voltage Substations
-
-✔ Transformers
-
-✔ Transmission Lines
-
-✔ Renewable Energy Assets
-
----
-
-## Business Intelligence
-
-✔ KPI Dashboard
-
-✔ Site Intelligence
-
-✔ Site Score
-
-✔ Market Intelligence
-
-✔ News Intelligence
-
-✔ Spatial Infrastructure Analysis
-
----
-
-## Artificial Intelligence
-
-✔ AI Advisor
-
-✔ Natural Language Queries
-
-✔ Executive Infrastructure Summaries
-
-✔ Context-aware Responses
-
-✔ Retrieval-Augmented Generation (RAG)
-
----
-
-## Spatial Intelligence
-
-✔ Power Readiness Analysis
-
-✔ Renewable Energy Analysis
-
-✔ Infrastructure Distance Calculations
-
-✔ Land Value Integration
-
-✔ Site Ranking
-
-# System Architecture
-
-```mermaid
-flowchart TD
-
-A[External Data Sources]
-
-B[ETL Pipelines]
-
-C[PostgreSQL + PostGIS]
-
-D[Repository Layer]
-
-E[Business Services]
-
-F[Interactive Dashboard]
-
-G[Site Intelligence]
-
-H[News Intelligence]
-
-I[AI Advisor]
-
-J[Executive Decision Support]
-
-A --> B
-B --> C
-C --> D
-D --> E
-
-E --> F
-E --> G
-E --> H
-
-F --> I
-G --> I
-H --> I
-
-I --> J
-```
-```
-
-┌──────────────────────┐
-│ External Data Sources│
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│    ETL Pipelines     │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ PostgreSQL + PostGIS │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Repository Layer     │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Business Services    │
-└──────────┬───────────┘
-           ▼
-      ┌────┴────┐
-      ▼         ▼
-┌──────────┐ ┌──────────┐
-│ GIS Map  │ │ News BI  │
-└────┬─────┘ └────┬─────┘
-     │            │
-     └────┬───────┘
-          ▼
-┌──────────────────────┐
-│ Site Intelligence    │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ AI Advisor           │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ OpenAI GPT           │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Executive Insights   │
-└──────────────────────┘
-```
-```                  
-
-# Dashboard Modules
-
-## Interactive GIS Map
-
-Visualizes:
-
-- Data Centers
-- High Voltage Substations
-- Transformers
-- Renewable Energy Assets
-- High Voltage Transmission Lines
-
----
-
-## KPI Dashboard
-
-Provides executive metrics for infrastructure assets, facilities, and renewable energy resources.
-
----
-
-## Site Intelligence
-
-Displays infrastructure proximity, renewable energy availability, land valuation, and technical site characteristics for the selected facility.
-
----
-
-## Site Score
-
-Calculates a unified infrastructure readiness score using spatial analysis and business intelligence metrics.
-
----
-
-## News Intelligence
-
-Aggregates recent industry news and links relevant articles to companies and facilities.
-
----
-
-## AI Advisor
-
-Provides conversational access to infrastructure intelligence using natural language.
-
-
-# AI Advisor
-
-The AI Advisor enables users to explore infrastructure intelligence using natural language.
-
-Current capabilities
-
-- Site Summaries
-- Infrastructure Analysis
-- Grid Readiness Evaluation
-- Renewable Energy Analysis
-- Executive Recommendations
-- News Summaries
-
-Upcoming
-
-- Intent Detection
-- Tool Routing
-- Context Awareness
-- LangGraph Agents
-- Agentic RAG
-
-
-# Technology Stack
-
-## Backend
-
-- Python
-- SQLAlchemy
-- PostgreSQL
-- PostGIS
-
-## GIS
-
-- GeoPandas
-- Shapely
-- PyDeck
-
-## Dashboard
-
-- Streamlit
-
-## AI
-
-- OpenAI
-- Retrieval-Augmented Generation (RAG)
-
-## Data Processing
-
-- Pandas
-- JSON
-- GeoJSON
-
-nrw-dc-bi/
-│
-├── app/
-│   ├── services/
-│   ├── repositories/
-│   ├── database/
-│   ├── spatial/
-│   ├── intelligence/
-│   └── ai/
-│
-├── ui/
-│
-├── data/
-│
-├── scripts/
-│
-├── tests/
-│
-└── README.md
-
-
-# Installation
-
-## Prerequisites
-
-- Python 3.12+
-- PostgreSQL 17 + PostGIS
-- uv (Python package manager)
-
-Install uv if you don't already have it:
-
-```bash
-pip install uv
-```
-
-or
-
-```bash
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
----
-
-## Clone the Repository
-
-```bash
-git clone <repository-url>
-
-cd nrw-dc-bi
-```
-
----
-
-## Create a Virtual Environment
-
-```bash
-uv venv
-```
-
-Activate it:
-
-### Windows
-
-```bash
-.venv\Scripts\activate
-```
-
-### Linux / macOS
-
-```bash
-source .venv/bin/activate
-```
-
----
-
-## Install Dependencies
-
-```bash
-uv sync
-```
-
-If you're not using a `uv.lock` yet, then instead use:
-
-```bash
-uv pip install -r requirements.txt
-```
-
----
-
-## Configure Environment
+## How to run
 
 ```bash
 cp .env.example .env
-```
-
-Update the database connection and OpenAI API key.
-
----
-
-## Run Database Migrations
-
-```bash
+docker compose up -d postgres
+docker exec -it nrw-postgis psql -U postgres -d nrw_dc_bi -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 alembic upgrade head
+
+python main.py hearings
+python main.py hearings-load
 ```
 
----
+`python main.py hearings` fetches the listing and writes `data/raw/hearings/page_1.html`, `merged.json`, and `parse_quality.json`.
 
-## Start the Dashboard
+`python main.py hearings-load` upserts relevant rows and writes `data/raw/hearings/quality_report.json`.
+
+Tests that do not need a database:
 
 ```bash
-streamlit run ui/app.py
+python -m unittest tests.test_hearings_html tests.test_hearings_scraper tests.test_hearings_filter tests.test_hearings_robots tests.test_signal_ingest
 ```
 
-The application will be available at:
-
-```
-http://localhost:8501
-```
-
-## Requirements
-
-- Python 3.12+
-- PostgreSQL 17
-- PostGIS
-- Git
-- uv
-
-# Running the Dashboard
+Database ingest, after `alembic upgrade head`. This loads `tests/fixtures/hearings/signals.json` into `iris_staging.signal_ingest`, checks both signal types, the EPSG:25832 point, the rejected coordinate, and a second load that inserts nothing, then rolls the transaction back:
 
 ```bash
-streamlit run ui/app.py
+python -m unittest tests.test_signal_ingest_db
 ```
-# Current Project Status
 
-## Completed
+The database test skips when `DATABASE_URL` is unset or `iris_staging.signal_ingest` is missing. It expects PostgreSQL 16 and PostGIS 3.4.
 
-- Data Collection
-- ETL Pipelines
-- GIS Dashboard
-- Interactive Map
-- Site Intelligence
-- Site Score
-- News Intelligence
-- AI Advisor
-- Infrastructure Layers
+## How I tested the ingest manually
 
-## In Progress
+The live `/de/mitmachen` listing currently has no relevant hearing, so `hearings-load` inserts nothing. To leave the fixture rows in `iris_staging.signal_ingest`:
 
-- Context-aware AI
-- Intent Detection
-- Tool Routing
-- LangGraph Integration
+```bash
+cp tests/fixtures/hearings/signals.json data/raw/hearings/merged.json
+python main.py hearings-load
+```
 
-## Planned
+This replaces `data/raw/hearings/merged.json` with the fixture and upserts the three kept rows. The database test above rolls its transaction back and does not leave those rows.
 
-- Multi-Agent AI
-- Predictive Site Recommendations
-- Investment Forecasting
-- Voice Interface
+## Sample output
 
+| File | What it is |
+|---|---|
+| `tests/fixtures/hearings/listing.html` | Public-style teasers for both signal types, one irrelevant teaser, one teaser with no title |
+| `tests/fixtures/hearings/empty.html` | Empty page |
+| `tests/fixtures/hearings/signals.json` | Loader input, including a coordinate, a duplicate, a blank title, and a non-numeric coordinate |
+| `samples/hearings/signal_ingest_sample.json` | The three rows the loader keeps |
+| `samples/hearings/quality_report.md` | Counts for that fixture run |
+| `samples/hearings/validation.sql` | Queries for signal type, duplicates, and geometry status |
 
-# Roadmap
+The checked-in live download under `data/raw/hearings/` is the real `/de/mitmachen` page. It does not currently contain either target signal. The fixture sample is the demonstration the portal's allowed page cannot provide.
 
-## Completed
+## Limitations
 
-- ETL Platform
-- GIS Visualization
-- Business Intelligence Dashboard
-- AI Advisor
-- News Intelligence
+- The HTML selectors and the place-name patterns are specific to this portal. A layout change needs a parser change. `HearingsHTMLDataParser` exists for that reason.
+- Relevance is a regex over the title and place text: a hearing, plus either regional planning or an Umspannwerk / Schaltanlage together with Erweiterung, Ersatzneubau, Neubau, or Ausbau. Other procedures on the same page are counted and dropped.
+- The allowed page does not publish coordinates, so live rows from `/de/mitmachen` stay `ambiguous` or `unresolved`. The resolved sample point comes from the fixture.
+- Search pagination stays unused because `robots.txt` disallows it.
+- Network timeouts, connection errors, HTTP 429, and HTTP 500/502/503/504 are retried by `HttpClient`. A failure after those retries stops the scrape. An empty body is saved and counted.
+- Invalid JSON does not load. It is reported as `malformed_file`.
 
-## Next
+## Disclaimer
 
-- Intent Detection
-- Context-aware Responses
-- Agentic RAG
-- LangGraph Workflows
-
-## Future
-
-- Predictive Site Ranking
-- Multi-Agent Decision Support
-- Voice-enabled AI Advisor
-
-
-# Vision
-
-The long-term vision is to build an AI-powered decision support platform for data center planning and infrastructure investment.
-
-By combining geospatial intelligence, power infrastructure, renewable energy, land valuation, market intelligence, and conversational AI, the platform enables users to evaluate and compare potential data center locations through natural language interaction.
-
-The project is designed to evolve into a comprehensive executive decision-support system that assists planners, investors, and infrastructure specialists in identifying optimal data center locations.
+I used Cursor AI for about 30–40% of the code. That includes extracting tags with BeautifulSoup, writing the HTML fixtures and JSON so both relevant and irrelevant articles are covered, and the GeoAlchemy code in `signal_ingest_loader.py`.

@@ -75,9 +75,26 @@ class SignalIngestLoader:
             "Loading Signal Ingest"
         )
 
-        records = self._load_json(
+        records, problem = self._load_json(
             self.source_file
         )
+
+        report = self._blank_report()
+
+        if problem == "malformed":
+
+            report["malformed_file"] = True
+
+            self._merge_parse_stats(report)
+
+            self._write_quality(report)
+
+            print(
+                "Malformed hearings JSON. "
+                "Nothing loaded."
+            )
+
+            return report
 
         print(
             f"Hearings : "
@@ -86,7 +103,7 @@ class SignalIngestLoader:
 
         try:
 
-            inserted, updated, unchanged = (
+            report.update(
                 self._load_records(
                     records
                 )
@@ -100,21 +117,56 @@ class SignalIngestLoader:
 
             raise
 
+        report["empty_response"] = problem in {
+            "missing",
+            "empty",
+        }
+
+        report["rows_loaded"] = (
+            report["inserted"]
+            + report["updated"]
+            + report["unchanged"]
+        )
+
+        self._merge_parse_stats(report)
+
+        self._write_quality(report)
+
         print("--------------------------------")
 
         print(
             f"Inserted  : "
-            f"{inserted}"
+            f"{report['inserted']}"
         )
 
         print(
             f"Updated   : "
-            f"{updated}"
+            f"{report['updated']}"
         )
 
         print(
             f"Unchanged : "
-            f"{unchanged}"
+            f"{report['unchanged']}"
+        )
+
+        print(
+            f"Duplicates skipped : "
+            f"{report['duplicates_skipped']}"
+        )
+
+        print(
+            f"Dropped missing    : "
+            f"{report['dropped_missing_fields']}"
+        )
+
+        print(
+            f"Ambiguous : "
+            f"{report['ambiguous']}"
+        )
+
+        print(
+            f"Unresolved: "
+            f"{report['unresolved']}"
         )
 
         print("--------------------------------")
@@ -124,11 +176,7 @@ class SignalIngestLoader:
             "Loaded Successfully"
         )
 
-        return {
-            "inserted": inserted,
-            "updated": updated,
-            "unchanged": unchanged,
-        }
+        return report
 
     # ======================================================
     # JSON
@@ -137,33 +185,37 @@ class SignalIngestLoader:
     @staticmethod
     def _load_json(
         file: Path,
-    ) -> list:
+    ) -> tuple[list, str | None]:
 
         if not file.exists():
 
-            return []
+            return [], "missing"
 
-        with file.open(
-            "r",
-            encoding="utf-8",
-        ) as handle:
+        try:
 
-            data = json.load(handle)
+            with file.open(
+                "r",
+                encoding="utf-8",
+            ) as handle:
 
-        if data is None:
+                data = json.load(handle)
 
-            return []
+        except json.JSONDecodeError:
+
+            return [], "malformed"
+
+        if data is None or data == []:
+
+            return [], "empty"
 
         if not isinstance(
             data,
             list,
         ):
 
-            raise ValueError(
-                f"Expected a JSON list in {file}"
-            )
+            return [], "malformed"
 
-        return data
+        return data, None
 
     # ======================================================
     # RECORDS
@@ -177,12 +229,21 @@ class SignalIngestLoader:
         inserted = 0
         updated = 0
         unchanged = 0
+        duplicates_skipped = 0
+        dropped_missing_fields = 0
+        dropped_not_relevant = 0
+        malformed_records = 0
+        resolved = 0
+        ambiguous = 0
+        unresolved = 0
 
         seen = set()
 
         for record in records:
 
             if not isinstance(record, dict):
+
+                malformed_records += 1
 
                 continue
 
@@ -202,9 +263,21 @@ class SignalIngestLoader:
                 not source_id
                 or not title
                 or not source_url
-                or source_id in seen
-                or record.get("relevant") is not True
             ):
+
+                dropped_missing_fields += 1
+
+                continue
+
+            if source_id in seen:
+
+                duplicates_skipped += 1
+
+                continue
+
+            if record.get("relevant") is not True:
+
+                dropped_not_relevant += 1
 
                 continue
 
@@ -228,6 +301,8 @@ class SignalIngestLoader:
 
             else:
 
+                dropped_not_relevant += 1
+
                 continue
 
             # --------------------------------------------------
@@ -238,55 +313,20 @@ class SignalIngestLoader:
                 record.get("place_text") or ""
             ).strip() or None
 
-            point = None
-
-            for x_key, y_key, default_crs in (
-                ("longitude", "latitude", 4326),
-                ("lon", "lat", 4326),
-                ("easting", "northing", 25832),
-            ):
-
-                if (
-                    record.get(x_key) is None
-                    or record.get(y_key) is None
-                ):
-
-                    continue
-
-                point = (
-                    float(record[x_key]),
-                    float(record[y_key]),
-                    int(
-                        record.get("crs")
-                        or record.get("srid")
-                        or default_crs
-                    ),
-                )
-
-                break
-
-            if (
-                point is None
-                and record.get("x") is not None
-                and record.get("y") is not None
-                and (
-                    record.get("crs")
-                    or record.get("srid")
-                )
-            ):
-
-                point = (
-                    float(record["x"]),
-                    float(record["y"]),
-                    int(
-                        record.get("crs")
-                        or record.get("srid")
-                    ),
-                )
+            point = self._coordinate(record)
 
             geom = None
 
-            if point is None and place:
+            if point == "malformed":
+
+                location_status = "unresolved"
+
+                location_note = (
+                    "rejected coordinate: "
+                    "value is not numeric"
+                )
+
+            elif point is None and place:
 
                 location_status = "ambiguous"
 
@@ -363,6 +403,18 @@ class SignalIngestLoader:
                     if geom is not None
                     else "unresolved"
                 )
+
+            if location_status == "resolved":
+
+                resolved += 1
+
+            elif location_status == "ambiguous":
+
+                ambiguous += 1
+
+            else:
+
+                unresolved += 1
 
             dates = {}
 
@@ -442,7 +494,172 @@ class SignalIngestLoader:
 
                 unchanged += 1
 
-        return inserted, updated, unchanged
+        return {
+            "inserted": inserted,
+            "updated": updated,
+            "unchanged": unchanged,
+            "rows_loaded": (
+                inserted + updated + unchanged
+            ),
+            "duplicates_skipped": duplicates_skipped,
+            "dropped_missing_fields": (
+                dropped_missing_fields
+            ),
+            "dropped_not_relevant": (
+                dropped_not_relevant
+            ),
+            "malformed_records": malformed_records,
+            "resolved": resolved,
+            "ambiguous": ambiguous,
+            "unresolved": unresolved,
+        }
+
+    # ======================================================
+    # COORDINATES AND QUALITY
+    # ======================================================
+
+    @staticmethod
+    def _coordinate(
+        record: dict,
+    ):
+
+        candidates = (
+            ("longitude", "latitude", 4326),
+            ("lon", "lat", 4326),
+            ("easting", "northing", 25832),
+        )
+
+        for x_key, y_key, default_crs in candidates:
+
+            if (
+                record.get(x_key) is None
+                or record.get(y_key) is None
+            ):
+
+                continue
+
+            return SignalIngestLoader._as_point(
+                record.get(x_key),
+                record.get(y_key),
+                record.get("crs")
+                or record.get("srid")
+                or default_crs,
+            )
+
+        if (
+            record.get("x") is None
+            or record.get("y") is None
+            or not (
+                record.get("crs")
+                or record.get("srid")
+            )
+        ):
+
+            return None
+
+        return SignalIngestLoader._as_point(
+            record.get("x"),
+            record.get("y"),
+            record.get("crs") or record.get("srid"),
+        )
+
+    @staticmethod
+    def _as_point(x_value, y_value, crs_value):
+
+        try:
+
+            return (
+                float(x_value),
+                float(y_value),
+                int(crs_value),
+            )
+
+        except (TypeError, ValueError):
+
+            return "malformed"
+
+    @staticmethod
+    def _blank_report() -> dict:
+
+        return {
+            "rows_loaded": 0,
+            "inserted": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "duplicates_skipped": 0,
+            "empty_pages": 0,
+            "empty_response": False,
+            "ambiguous": 0,
+            "unresolved": 0,
+            "resolved": 0,
+            "dropped_missing_fields": 0,
+            "dropped_not_relevant": 0,
+            "malformed_records": 0,
+            "malformed_file": False,
+        }
+
+    def _merge_parse_stats(
+        self,
+        report: dict,
+    ):
+
+        path = (
+            self.paths.hearings_raw
+            / "parse_quality.json"
+        )
+
+        if not path.exists():
+
+            return
+
+        try:
+
+            stats = json.loads(
+                path.read_text(encoding="utf-8")
+            )
+
+        except json.JSONDecodeError:
+
+            return
+
+        if not isinstance(stats, dict):
+
+            return
+
+        report["empty_pages"] = int(
+            stats.get("empty_pages") or 0
+        )
+
+        report["duplicates_skipped"] += int(
+            stats.get("duplicates_skipped") or 0
+        )
+
+        report["dropped_missing_fields"] += int(
+            stats.get("dropped_missing_fields") or 0
+        )
+
+    def _write_quality(
+        self,
+        report: dict,
+    ):
+
+        path = (
+            self.paths.hearings_raw
+            / "quality_report.json"
+        )
+
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        path.write_text(
+            json.dumps(
+                report,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
     # ======================================================
     # UPSERT

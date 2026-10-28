@@ -52,12 +52,7 @@ class HearingsScraper:
     # SCRAPE
     # =====================================================
 
-    def scrape(
-        self,
-        start_page: int = 1,
-        max_pages: int = 5,
-        page_size: int = 20,
-    ):
+    def scrape(self):
 
         if not self.source.urls:
 
@@ -67,53 +62,59 @@ class HearingsScraper:
 
         url = self.source.urls[0]
 
-        robots = RobotFileParser()
-        origin = urlsplit(url)
-        robots.set_url(
-            f"{origin.scheme}://{origin.netloc}/de/robots.txt"
-        )
-        robots.read()
-
-        if not robots.can_fetch("*", url):
+        if not self._allowed(url):
 
             print(
                 "Excluded by robots.txt: "
                 f"{url}"
             )
 
-            return
+            return {
+                "fetched": 0,
+                "empty_pages": 0,
+                "excluded_by_robots": True,
+            }
 
-        for page in range(
-            start_page,
-            start_page + max_pages,
+        # /de/mitmachen is one HTML page. It ignores
+        # page and pageSize. The search results that
+        # do paginate are disallowed by robots.txt.
+
+        print(
+            "Downloading hearings listing..."
+        )
+
+        response = self.client.get(url)
+
+        for stale in self.output_dir.glob(
+            "page_*.html"
         ):
 
+            stale.unlink()
+
+        output_file = (
+            self.output_dir
+            / "page_1.html"
+        )
+
+        body = response.text or ""
+
+        output_file.write_text(
+            body,
+            encoding="utf-8",
+        )
+
+        empty_pages = (
+            0 if body.strip() else 1
+        )
+
+        print(
+            f"Saved {output_file}"
+        )
+
+        if empty_pages:
+
             print(
-                f"Downloading page {page}..."
-            )
-
-            response = self.client.get(
-                url,
-                params={
-                    "page": page,
-                    "pageSize": page_size,
-                    "group": "",
-                    "filter": "",
-                },
-            )
-
-            output_file = (
-                self.output_dir
-                / f"page_{page}.html"
-            )
-
-            output_file.write_text(
-                response.text,
-                encoding="utf-8",
-            )
-
-            print(
-                f"Saved {output_file}"
+                "Empty hearings response."
             )
 
         print("--------------------------------")
@@ -125,3 +126,31 @@ class HearingsScraper:
             f"Output Directory : "
             f"{self.output_dir}"
         )
+
+        return {
+            "fetched": 1,
+            "empty_pages": empty_pages,
+            "excluded_by_robots": False,
+        }
+
+    def _allowed(
+        self,
+        url: str,
+    ) -> bool:
+
+        origin = urlsplit(url)
+
+        robots_url = (
+            f"{origin.scheme}://{origin.netloc}"
+            "/de/robots.txt"
+        )
+
+        response = self.client.get(robots_url)
+
+        robots = RobotFileParser()
+
+        robots.parse(
+            (response.text or "").splitlines()
+        )
+
+        return robots.can_fetch("*", url)

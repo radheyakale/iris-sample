@@ -38,7 +38,7 @@ DATA_SOURCES = {
     # ------------------------------------------------------
 
     "hearings": DataSource(
-        name="Marktstammdatenregister",
+        name="Beteiligungsportal Baden-Württemberg",
         country_code="DE",
         urls=(
             "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen",

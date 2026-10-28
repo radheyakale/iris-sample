@@ -1,0 +1,56 @@
+[
+  {
+    "source_id": "regionalplanung-stuttgart",
+    "title": "Öffentlichkeitsbeteiligung zur Änderung der Regionalplanung in Stuttgart",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/regionalplanung-stuttgart",
+    "place_text": "Stuttgart",
+    "relevant": true,
+    "published_at": "2026-10-03",
+    "participation_start": "2026-10-13",
+    "participation_end": "2026-11-13"
+  },
+  {
+    "source_id": "regionalplanung-stuttgart",
+    "title": "Öffentlichkeitsbeteiligung zur Änderung der Regionalplanung in Stuttgart",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/regionalplanung-stuttgart",
+    "place_text": "Stuttgart",
+    "relevant": true,
+    "published_at": "2026-10-03",
+    "participation_start": "2026-10-13",
+    "participation_end": "2026-11-13"
+  },
+  {
+    "source_id": "umspannwerk-karlsruhe",
+    "title": "Offenlage zur Erweiterung des Umspannwerks in Karlsruhe",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/umspannwerk-karlsruhe",
+    "place_text": "Karlsruhe",
+    "relevant": true,
+    "longitude": 8.4037,
+    "latitude": 49.0069,
+    "published_at": null,
+    "participation_start": "2026-09-01",
+    "participation_end": "2026-09-30"
+  },
+  {
+    "source_id": "umspannwerk-bad-coordinate",
+    "title": "Offenlage zur Erweiterung des Umspannwerks in Pforzheim",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/umspannwerk-pforzheim",
+    "place_text": "Pforzheim",
+    "relevant": true,
+    "longitude": "not-a-number",
+    "latitude": 48.89
+  },
+  {
+    "source_id": "missing-title",
+    "title": "  ",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/missing-title",
+    "relevant": true
+  },
+  "not-a-record",
+  {
+    "source_id": "haushalt",
+    "title": "Kommunaler Haushalt",
+    "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/haushalt",
+    "relevant": false
+  }
+]

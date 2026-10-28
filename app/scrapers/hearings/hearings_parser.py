@@ -59,6 +59,8 @@ class HearingsParser:
             )
 
         merged_records = []
+        empty_pages = 0
+        dropped_missing_fields = 0
 
         page_files = sorted(
             self.input_dir.glob(
@@ -94,7 +96,13 @@ class HearingsParser:
                 base_url=self.base_url,
             )
 
-            if not records:
+            dropped_missing_fields += (
+                self.html_parser.dropped_missing_fields
+            )
+
+            if not html.strip() or not records:
+
+                empty_pages += 1
 
                 print(
                     f"⚠ {page_file.name}: "
@@ -108,8 +116,51 @@ class HearingsParser:
                 records
             )
 
+        seen = set()
+        unique_records = []
+        duplicates_skipped = 0
+
+        for record in merged_records:
+
+            source_id = str(
+                record.get("source_id") or ""
+            ).strip()
+
+            if source_id and source_id in seen:
+
+                duplicates_skipped += 1
+
+                continue
+
+            if source_id:
+
+                seen.add(source_id)
+
+            unique_records.append(record)
+
         merged_records = HearingsFilter().apply(
-            merged_records
+            unique_records
+        )
+
+        quality = {
+            "pages": len(page_files),
+            "empty_pages": empty_pages,
+            "records": len(merged_records),
+            "duplicates_skipped": duplicates_skipped,
+            "dropped_missing_fields": dropped_missing_fields,
+        }
+
+        quality_file = (
+            self.input_dir
+            / "parse_quality.json"
+        )
+
+        quality_file.write_text(
+            json.dumps(
+                quality,
+                indent=2,
+            ),
+            encoding="utf-8",
         )
 
         with self.output_file.open(

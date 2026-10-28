@@ -1,0 +1,50 @@
+{
+  "description": "Fixture rows kept for iris_staging.signal_ingest. The Stuttgart and Karlsruhe titles follow the public portal's teaser markup. The Karlsruhe longitude/latitude is in tests/fixtures/hearings/signals.json so the EPSG:25832 path can be shown; the live HTML listing does not publish coordinates. The Pforzheim row is the visible rejection of a non-numeric coordinate.",
+  "rows": [
+    {
+      "source_system": "beteiligung_bw",
+      "source_id": "regionalplanung-stuttgart",
+      "signal_type": "regional_plan_amendment",
+      "title": "Öffentlichkeitsbeteiligung zur Änderung der Regionalplanung in Stuttgart",
+      "published_at": "2026-10-03",
+      "participation_start": "2026-10-13",
+      "participation_end": "2026-11-13",
+      "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/regionalplanung-stuttgart",
+      "place_text": "Stuttgart",
+      "geom": null,
+      "geom_srid": 25832,
+      "location_status": "ambiguous",
+      "location_note": "place name only; source has no coordinate"
+    },
+    {
+      "source_system": "beteiligung_bw",
+      "source_id": "umspannwerk-karlsruhe",
+      "signal_type": "substation_expansion_hearing",
+      "title": "Offenlage zur Erweiterung des Umspannwerks in Karlsruhe",
+      "published_at": null,
+      "participation_start": "2026-09-01",
+      "participation_end": "2026-09-30",
+      "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/umspannwerk-karlsruhe",
+      "place_text": "Karlsruhe",
+      "geom": "POINT(456391.24642696284 5428394.10646472)",
+      "geom_srid": 25832,
+      "location_status": "resolved",
+      "location_note": null
+    },
+    {
+      "source_system": "beteiligung_bw",
+      "source_id": "umspannwerk-bad-coordinate",
+      "signal_type": "substation_expansion_hearing",
+      "title": "Offenlage zur Erweiterung des Umspannwerks in Pforzheim",
+      "published_at": null,
+      "participation_start": null,
+      "participation_end": null,
+      "source_url": "https://beteiligungsportal.baden-wuerttemberg.de/de/mitmachen/lp-18/umspannwerk-pforzheim",
+      "place_text": "Pforzheim",
+      "geom": null,
+      "geom_srid": 25832,
+      "location_status": "unresolved",
+      "location_note": "rejected coordinate: value is not numeric"
+    }
+  ]
+}

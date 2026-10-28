@@ -1138,7 +1138,7 @@ class PipelineRunner:
 
         self.hearings()
 
-        self.hearings_parse()
+        self.hearings_load()
 
         self.markets()
 
