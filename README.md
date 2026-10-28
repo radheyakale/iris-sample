@@ -97,7 +97,7 @@ This replaces `data/raw/hearings/merged.json` with the fixture and upserts the t
 | `samples/hearings/quality_report.md` | Counts for that fixture run |
 | `samples/hearings/validation.sql` | Queries for signal type, duplicates, and geometry status |
 
-The checked-in live download under `data/raw/hearings/` is the real `/de/mitmachen` page. It does not currently contain either target signal. The fixture sample is the demonstration the portal's allowed page cannot provide.
+`python main.py hearings` writes the live `/de/mitmachen` page to `data/raw/hearings/`. That directory is gitignored. The listing does not currently contain either target signal, so the load inserts nothing. `samples/hearings/` is the committed fixture output for the rows the allowed page cannot provide.
 
 ## Limitations
 
